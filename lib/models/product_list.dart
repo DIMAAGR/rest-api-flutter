@@ -1,12 +1,13 @@
+import 'dart:convert';
 import 'dart:math';
-
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:shop/data/dummy_data.dart';
 import 'package:shop/models/product.dart';
 
 class ProductList with ChangeNotifier {
   List<Product> _items = dummyProducts;
-
+  final _baseURL = "https://shop-rest-api-default-rtdb.firebaseio.com/";
   List<Product> get items => [..._items];
   List<Product> get favoriteItems =>
       _items.where((prod) => prod.isFavorite).toList();
@@ -15,7 +16,7 @@ class ProductList with ChangeNotifier {
     return _items.length;
   }
 
-  void saveProduct(Map<String, Object> data) {
+  Future<void> saveProduct(Map<String, Object> data) {
     bool hasId = data['id'] != null;
 
     final product = Product(
@@ -27,29 +28,55 @@ class ProductList with ChangeNotifier {
     );
 
     if (hasId) {
-      updateProduct(product);
+      return updateProduct(product);
     } else {
-      addProduct(product);
+      return addProduct(product);
     }
   }
 
-  void addProduct(Product product) {
-    _items.add(product);
-    notifyListeners();
+  Future<void> addProduct(Product product) {
+    // PARA ADICIONAR/ ENVIAR INFORMAÇÕES PARA O BANCO DE DADOS
+    // UTILIZANDO UMA API REST É NECESSÁRIO UTILIZAR O post();
+    // O POST RECEBE UM URI QUE RECEBE UM CAMINHO NESSE CASO O
+    // /products.json, ESSE CAMINHO VAI PARA O BANCO DE DADOS QUE É
+    // EM FORMATO JSON, SENDO OBRIGATORIO TER O .json no final
+    // O URI TMB RECEBE UM BODY COM UM MAP QUE É CRIADO COM {},
+    // PARA ISSO UTILIZA-SE O jsonEncode(), COM O MAP PASSAMOS
+    // OS VALORES QUE QUEREMOS ENVIAR PARA O BANCO DE DADOS QUE SÃO
+    // AS INFORMAÇÕES DE CADA PRODUTO!
+    final future = http.post(Uri.parse("$_baseURL/products.json"),
+        body: jsonEncode({
+          "name": product.name,
+          "description": product.description,
+          "price": product.price,
+          "imageUrl": product.imageUrl,
+          "isFavorite": product.isFavorite,
+        }));
+    return future.then((value) {
+      // O THEN É EXECUTADO DEPOIS QUE AS INFORMAÇÕES
+      // IREM PARA O BACKEND E RETORNAREM AO USUÁRIO
+      _items.add(Product(
+          id: jsonDecode(value.body)['name'],
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          imageUrl: product.imageUrl));
+      notifyListeners();
+    });
   }
 
-  void updateProduct(Product product) {
+  Future<void> updateProduct(Product product) {
     int index = _items.indexWhere((p) => p.id == product.id);
 
     if (index >= 0) {
       _items[index] = product;
       notifyListeners();
     }
+    return Future.value(); // RETORNARÁ NADA(VOID)!
   }
 
   void removeProduct(Product product) {
     int index = _items.indexWhere((p) => p.id == product.id);
-
     if (index >= 0) {
       _items.removeWhere((p) => p.id == product.id);
       notifyListeners();
@@ -57,21 +84,21 @@ class ProductList with ChangeNotifier {
   }
 }
 
-  // bool _showFavoriteOnly = false;
+// bool _showFavoriteOnly = false;
 
-  // List<Product> get items {
-  //   if (_showFavoriteOnly) {
-  //     return _items.where((prod) => prod.isFavorite).toList();
-  //   }
-  //   return [..._items];
-  // }
+// List<Product> get items {
+//   if (_showFavoriteOnly) {
+//     return _items.where((prod) => prod.isFavorite).toList();
+//   }
+//   return [..._items];
+// }
 
-  // void showFavoriteOnly() {
-  //   _showFavoriteOnly = true;
-  //   notifyListeners();
-  // }
+// void showFavoriteOnly() {
+//   _showFavoriteOnly = true;
+//   notifyListeners();
+// }
 
-  // void showAll() {
-  //   _showFavoriteOnly = false;
-  //   notifyListeners();
-  // }
+// void showAll() {
+//   _showFavoriteOnly = false;
+//   notifyListeners();
+// }
